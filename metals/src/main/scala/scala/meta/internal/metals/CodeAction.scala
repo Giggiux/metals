@@ -16,6 +16,12 @@ trait CodeAction {
    */
   def kind: String
 
+  def resolve(
+      codeAction: l.CodeAction,
+      token: CancelToken
+  )(implicit ec: ExecutionContext): Future[l.CodeAction] =
+    Future.successful(codeAction)
+
   def contribute(
       params: l.CodeActionParams,
       token: CancelToken

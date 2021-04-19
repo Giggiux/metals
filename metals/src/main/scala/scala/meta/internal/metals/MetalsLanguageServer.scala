@@ -327,6 +327,11 @@ class MetalsLanguageServer(
           s"Started: Metals version ${BuildInfo.metalsVersion} in workspace '$workspace' $clientInfo."
         )
 
+        val codeActionResolveSupportCapabilities
+            : Option[CodeActionResolveSupportCapabilities] = Option(
+          params.getCapabilities.getTextDocument.getCodeAction.getResolveSupport
+        )
+
         clientConfig.experimentalCapabilities =
           ClientExperimentalCapabilities.from(params.getCapabilities)
         clientConfig.initializationOptions = InitializationOptions.from(params)
@@ -635,6 +640,7 @@ class MetalsLanguageServer(
           buildTargets
         )
         codeActionProvider = new CodeActionProvider(
+          codeActionResolveSupportCapabilities,
           compilers,
           buffers,
           buildTargets,
@@ -773,15 +779,17 @@ class MetalsLanguageServer(
         capabilities.setDocumentSymbolProvider(true)
         capabilities.setDocumentFormattingProvider(true)
         if (initializeParams.supportsCodeActionLiterals) {
-          capabilities.setCodeActionProvider(
-            new CodeActionOptions(
+          capabilities.setCodeActionProvider({
+            val codeActionOptions = new CodeActionOptions(
               List(
                 CodeActionKind.QuickFix,
                 CodeActionKind.Refactor,
                 CodeActionKind.SourceOrganizeImports
               ).asJava
             )
-          )
+            codeActionOptions.setResolveProvider(true)
+            codeActionOptions
+          })
         } else {
           capabilities.setCodeActionProvider(true)
         }
@@ -1459,6 +1467,14 @@ class MetalsLanguageServer(
   ): CompletableFuture[util.List[l.CodeAction]] =
     CancelTokens.future { token =>
       codeActionProvider.codeActions(params, token).map(_.asJava)
+    }
+
+  @JsonRequest("codeAction/resolve")
+  def codeActionResolve(
+      params: l.CodeAction
+  ): CompletableFuture[l.CodeAction] =
+    CancelTokens.future { token =>
+      codeActionProvider.resolve(params, token)
     }
 
   @JsonRequest("textDocument/codeLens")

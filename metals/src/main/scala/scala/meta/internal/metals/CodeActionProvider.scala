@@ -11,12 +11,21 @@ import scala.meta.pc.CancelToken
 import org.eclipse.{lsp4j => l}
 
 final class CodeActionProvider(
+    codeActionResolveSupportCapabilities: Option[
+      l.CodeActionResolveSupportCapabilities
+    ],
     compilers: Compilers,
     buffers: Buffers,
     buildTargets: BuildTargets,
     scalafixProvider: ScalafixProvider,
     trees: Trees
 )(implicit ec: ExecutionContext) {
+
+  private val resolveEditSupport: Boolean =
+    codeActionResolveSupportCapabilities.exists(
+      _.getProperties.contains("edit")
+    )
+
   private val allActions: List[CodeAction] = List(
     new ImplementAbstractMembers(compilers),
     new ImportMissingSymbol(compilers),
@@ -44,6 +53,14 @@ final class CodeActionProvider(
     }
 
     Future.sequence(actions).map(_.flatten)
+  }
+
+  def resolve(
+      codeAction: l.CodeAction,
+      token: CancelToken
+  )(implicit ec: ExecutionContext): Future[l.CodeAction] = {
+
+    Future.successful { codeAction }
   }
 
 }
