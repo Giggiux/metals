@@ -66,7 +66,9 @@ final class RenameProvider(
   ): Future[Option[LSPRange]] = {
     val source = params.getTextDocument.getUri.toAbsolutePath
     compilations.compilationFinished(source).flatMap { _ =>
+    pprint.log(source)
       definitionProvider.definition(source, params, token).map { definition =>
+        pprint.log(definition)
         val symbolOccurrence =
           definitionProvider
             .symbolOccurrence(source, params.getPosition)
@@ -76,6 +78,7 @@ final class RenameProvider(
                 params.getPosition()
               )
             )
+        pprint.log(symbolOccurrence)
         for {
           (occurence, _) <- symbolOccurrence
           definitionLocation <- definition.locations.asScala.headOption
