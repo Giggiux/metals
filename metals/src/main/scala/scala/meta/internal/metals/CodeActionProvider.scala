@@ -1,30 +1,44 @@
 package scala.meta.internal.metals
 
+import org.eclipse.lsp4j.CodeActionResolveSupportCapabilities
+
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-
 import scala.meta.internal.metals.codeactions._
 import scala.meta.internal.parsing.Trees
 import scala.meta.pc.CancelToken
-
 import org.eclipse.{lsp4j => l}
 
+import scala.meta.internal.rename.RenameProvider
+
 final class CodeActionProvider(
-    codeActionResolveSupportCapabilities: Option[
-      l.CodeActionResolveSupportCapabilities
+    codeActionCapabilities: Option[
+      l.CodeActionCapabilities
     ],
     compilers: Compilers,
     buffers: Buffers,
     buildTargets: BuildTargets,
     scalafixProvider: ScalafixProvider,
+    renameProvider: RenameProvider,
     trees: Trees
 )(implicit ec: ExecutionContext) {
 
-  private val resolveEditSupport: Boolean =
-    codeActionResolveSupportCapabilities.exists(
-      _.getProperties.contains("edit")
-    )
+  private val codeActionResolveSupportCapabilities
+      : Option[CodeActionResolveSupportCapabilities] =
+    codeActionCapabilities.map(_.getResolveSupport)
+
+  private val codeActionDataSupport: Option[Boolean] =
+    codeActionCapabilities.map(_.getDataSupport)
+
+  private val resolveSupport: Boolean = (for {
+    resolveSupportCapabilities <- codeActionResolveSupportCapabilities
+    dataSupport <- codeActionDataSupport
+    properties = resolveSupportCapabilities.getProperties
+  } yield dataSupport && properties.contains("edit")).getOrElse(false)
+
+  private val renameAction: RenameActions =
+    new RenameActions(buffers, trees, renameProvider, resolveSupport)
 
   private val allActions: List[CodeAction] = List(
     new ImplementAbstractMembers(compilers),
@@ -32,7 +46,8 @@ final class CodeActionProvider(
     new CreateNewSymbol(),
     new StringActions(buffers, trees),
     new OrganizeImports(scalafixProvider, buildTargets),
-    new InsertInferredType(trees, compilers)
+    new InsertInferredType(trees, compilers),
+    renameAction
   )
 
   def codeActions(
@@ -60,7 +75,15 @@ final class CodeActionProvider(
       token: CancelToken
   )(implicit ec: ExecutionContext): Future[l.CodeAction] = {
 
-    Future.successful { codeAction }
+    val data = codeAction.getData
+
+    data match {
+      case renameClassActionData: RenameClassActionData =>
+        renameAction
+          .resolve(renameClassActionData, token)
+      case _ => Future.successful(codeAction)
+    }
+
   }
 
 }

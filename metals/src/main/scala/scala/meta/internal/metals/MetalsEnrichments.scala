@@ -14,7 +14,6 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-
 import scala.collection.convert.DecorateAsJava
 import scala.collection.convert.DecorateAsScala
 import scala.collection.mutable
@@ -28,7 +27,6 @@ import scala.util.Properties
 import scala.util.Try
 import scala.util.control.NonFatal
 import scala.{meta => m}
-
 import scala.meta.inputs.Input
 import scala.meta.internal.mtags.MtagsEnrichments
 import scala.meta.internal.parsing.EmptyResult
@@ -37,11 +35,13 @@ import scala.meta.internal.semanticdb.Scala.Symbols
 import scala.meta.internal.trees.Origin
 import scala.meta.internal.{semanticdb => s}
 import scala.meta.io.AbsolutePath
-
 import ch.epfl.scala.{bsp4j => b}
 import io.undertow.server.HttpServerExchange
 import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.{lsp4j => l}
+
+import scala.collection.mutable.ListBuffer
+import scala.meta.transversers.SimpleTraverser
 
 /**
  * One stop shop for all extension methods that are used in the metals build.
@@ -736,6 +736,25 @@ object MetalsEnrichments
 
     def findFirstTrailing(predicate: m.Token => Boolean): Option[m.Token] =
       trailingTokens.find(predicate)
+
+    def getClassDefinitions: List[Defn.Class] = {
+      val nodes: ListBuffer[Defn.Class] = ListBuffer()
+
+      val traverser = new SimpleTraverser {
+        override def apply(tree: Tree): Unit = tree match {
+          case p: Pkg =>
+            super.apply(p)
+          case classNode: Defn.Class =>
+            nodes += classNode
+          case s: Source =>
+            super.apply(s)
+          case _ =>
+        }
+      }
+      traverser(tree)
+
+      nodes.toList
+    }
   }
 
 }

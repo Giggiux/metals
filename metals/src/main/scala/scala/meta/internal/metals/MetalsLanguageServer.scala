@@ -327,9 +327,8 @@ class MetalsLanguageServer(
           s"Started: Metals version ${BuildInfo.metalsVersion} in workspace '$workspace' $clientInfo."
         )
 
-        val codeActionResolveSupportCapabilities
-            : Option[CodeActionResolveSupportCapabilities] = Option(
-          params.getCapabilities.getTextDocument.getCodeAction.getResolveSupport
+        val codeActionCapabilities: Option[CodeActionCapabilities] = Option(
+          params.getCapabilities.getTextDocument.getCodeAction
         )
 
         clientConfig.experimentalCapabilities =
@@ -640,11 +639,12 @@ class MetalsLanguageServer(
           buildTargets
         )
         codeActionProvider = new CodeActionProvider(
-          codeActionResolveSupportCapabilities,
+          codeActionCapabilities,
           compilers,
           buffers,
           buildTargets,
           scalafixProvider,
+          renameProvider,
           trees
         )
         doctor = new Doctor(

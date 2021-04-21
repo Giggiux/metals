@@ -2,11 +2,11 @@ package scala.meta.internal.metals
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-
 import scala.meta.internal.metals.MetalsEnrichments._
 import scala.meta.pc.CancelToken
-
 import org.eclipse.{lsp4j => l}
+
+import scala.meta.internal.metals.codeactions.CodeActionData
 
 trait CodeAction {
 
@@ -16,11 +16,10 @@ trait CodeAction {
    */
   def kind: String
 
-  def resolve(
-      codeAction: l.CodeAction,
+  def resolve[D <: CodeActionData](
+      data: D,
       token: CancelToken
-  )(implicit ec: ExecutionContext): Future[l.CodeAction] =
-    Future.successful(codeAction)
+  )(implicit ec: ExecutionContext): Future[l.CodeAction]
 
   def contribute(
       params: l.CodeActionParams,
