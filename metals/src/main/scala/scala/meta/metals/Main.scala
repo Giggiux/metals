@@ -2,18 +2,17 @@ package scala.meta.metals
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
-
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
-
 import scala.meta.internal.metals.BuildInfo
 import scala.meta.internal.metals.GlobalTrace
 import scala.meta.internal.metals.MetalsLanguageClient
 import scala.meta.internal.metals.MetalsLanguageServer
 import scala.meta.internal.metals.MetalsServerConfig
 import scala.meta.internal.metals.ScalaVersions
-
 import org.eclipse.lsp4j.jsonrpc.Launcher
+
+import java.io.{File, PrintWriter}
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -44,6 +43,9 @@ object Main {
     }
     val systemIn = System.in
     val systemOut = System.out
+    val messageTracer = new PrintWriter(
+      new File("/Users/lfrunzio/messageTracer.log")
+    )
     val tracePrinter = GlobalTrace.setup("LSP")
     val exec = Executors.newCachedThreadPool()
     val ec = ExecutionContext.fromExecutorService(exec)
@@ -63,6 +65,7 @@ object Main {
         .setOutput(systemOut)
         .setRemoteInterface(classOf[MetalsLanguageClient])
         .setLocalService(server)
+        .traceMessages(messageTracer)
         .create()
       val clientProxy = launcher.getRemoteProxy
       server.connectToLanguageClient(clientProxy)

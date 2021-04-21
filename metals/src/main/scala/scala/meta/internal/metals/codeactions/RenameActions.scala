@@ -1,17 +1,16 @@
 package scala.meta.internal.metals.codeactions
 
-import org.eclipse.lsp4j
+import com.google.gson.JsonObject
 import org.eclipse.lsp4j.{CodeActionKind, CodeActionParams, RenameParams}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.meta.{Defn, Tree, Type}
+import scala.meta.{Defn, Type}
 import scala.meta.internal.metals.{Buffers, CodeAction}
 import scala.meta.internal.parsing.Trees
 import scala.meta.pc.CancelToken
 import org.eclipse.{lsp4j => l}
 
 import scala.meta.internal.metals.MetalsEnrichments._
-import scala.meta.internal.metals.codeactions.RenameActions.renameClassAsFileTitle
 import scala.meta.internal.rename.RenameProvider
 
 class RenameActions(
@@ -29,14 +28,14 @@ class RenameActions(
 
   override def contribute(params: CodeActionParams, token: CancelToken)(implicit
       ec: ExecutionContext
-  ): Future[Seq[lsp4j.CodeAction]] = {
+  ): Future[Seq[l.CodeAction]] = {
     val uri = params.getTextDocument.getUri
     val path = uri.toAbsolutePath
     val range = params.getRange
 
     Future.successful(trees.get(path) match {
       case Some(tree) =>
-        val fileName = uri.toAbsolutePath.filename.replaceAll("\\.scala$", "")
+        val fileName = fileNameFromUri(uri)
         val classDefinitions = tree.getClassDefinitions
 
         val fileAndClassHaveDifferentName = classDefinitions.length == 1 &&
@@ -44,12 +43,16 @@ class RenameActions(
           classDefinitions.head.name.pos.toLSP.overlapsWith(range) &&
           !getExtendsNames(classDefinitions.head).contains(fileName)
 
-        if (fileAndClassHaveDifferentName) List(renameClassAsFileAction())
+        if (fileAndClassHaveDifferentName)
+          List(renameClassAsFileAction(uri, classDefinitions.head, fileName))
         else Nil
 
       case _ => Nil
     })
   }
+
+  def fileNameFromUri(uri: String) =
+    uri.toAbsolutePath.filename.replaceAll("\\.scala$", "")
 
   private def renameClassAsFileAction(
       uri: String,
@@ -69,9 +72,7 @@ class RenameActions(
     codeAction.setData(
       RenameClassActionData(
         uri = uri,
-        range = range,
-        classDefn = classDefn,
-        fileName = fileName
+        range = range
       )
     )
 
@@ -86,32 +87,31 @@ class RenameActions(
       }
     }
 
-  def resolve(data: RenameClassActionData, token: CancelToken)(implicit
+  override def resolve(token: CancelToken)(implicit
       ec: ExecutionContext
-  ): Future[l.CodeAction] = {
-
-    val uri = data.uri
-    val classDefn = data.classDefn
-    val fileName = data.fileName
-
-    renameClassAsFileResolveAction(uri, classDefn, fileName, token)
+  ): PartialFunction[JsonObject, Future[l.CodeAction]] = {
+    case CodeActionDataParsers.renameClassActionDataParser.Jsonized(
+          RenameClassActionData(uri, range, RenameActions.codeActionDataType)
+        ) =>
+      renameClassAsFileResolveAction(uri, range, token)
 
   }
 
   private def renameClassAsFileResolveAction(
       uri: String,
-      classDefn: Defn.Class,
-      fileName: String,
+      range: l.Range,
       token: CancelToken
   )(implicit
       ec: ExecutionContext
   ): Future[l.CodeAction] = {
-    val className = classDefn.name.value
 
-    val range = classDefn.name.pos.toLSP
+    val fileName = fileNameFromUri(uri)
 
     val textDocumentIdentifier: l.TextDocumentIdentifier =
       uri.toAbsolutePath.toTextDocumentIdentifier
+
+    range.getStart.setCharacter(range.getStart.getCharacter + 1)
+
     val namePosition: l.Position = range.getStart
 
     val renameParams = new RenameParams(
@@ -119,6 +119,7 @@ class RenameActions(
       namePosition,
       fileName
     )
+    pprint.log(renameParams)
 
     for {
       workspaceEdit <- renameProvider.rename(renameParams, token)
@@ -126,13 +127,14 @@ class RenameActions(
         val codeAction = new l.CodeAction()
 
         codeAction.setTitle(
-          RenameActions.renameClassAsFileTitle(fileName, className)
+          s"Resolve Rename Class as $fileName"
         )
         codeAction.setKind(l.CodeActionKind.Refactor)
         codeAction.setEdit(
           workspaceEdit
         )
 
+        pprint.log(codeAction)
         codeAction
       }
     } yield codeAction
@@ -141,6 +143,8 @@ class RenameActions(
 }
 
 object RenameActions {
+  val codeActionDataType: String = "RenameClassActionData"
+
   def renameClassAsFileTitle(fileName: String, className: String) = {
     s"Rename class $className as $fileName"
   }

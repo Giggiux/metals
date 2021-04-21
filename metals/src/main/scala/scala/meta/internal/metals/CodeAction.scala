@@ -1,5 +1,7 @@
 package scala.meta.internal.metals
 
+import com.google.gson.JsonObject
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.meta.internal.metals.MetalsEnrichments._
@@ -16,10 +18,9 @@ trait CodeAction {
    */
   def kind: String
 
-  def resolve[D <: CodeActionData](
-      data: D,
-      token: CancelToken
-  )(implicit ec: ExecutionContext): Future[l.CodeAction]
+  def resolve(token: CancelToken)(implicit
+      ec: ExecutionContext
+  ): PartialFunction[JsonObject, Future[l.CodeAction]] = PartialFunction.empty
 
   def contribute(
       params: l.CodeActionParams,

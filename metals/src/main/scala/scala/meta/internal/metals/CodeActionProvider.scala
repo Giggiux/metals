@@ -1,5 +1,6 @@
 package scala.meta.internal.metals
 
+import com.google.gson.JsonObject
 import org.eclipse.lsp4j.CodeActionResolveSupportCapabilities
 
 import scala.collection.JavaConverters._
@@ -10,6 +11,10 @@ import scala.meta.internal.parsing.Trees
 import scala.meta.pc.CancelToken
 import org.eclipse.{lsp4j => l}
 
+import scala.meta.internal.metals.JsonParser.{
+  XtensionSerializableToJson,
+  XtensionSerializedAsJson
+}
 import scala.meta.internal.rename.RenameProvider
 
 final class CodeActionProvider(
@@ -37,9 +42,6 @@ final class CodeActionProvider(
     properties = resolveSupportCapabilities.getProperties
   } yield dataSupport && properties.contains("edit")).getOrElse(false)
 
-  private val renameAction: RenameActions =
-    new RenameActions(buffers, trees, renameProvider, resolveSupport)
-
   private val allActions: List[CodeAction] = List(
     new ImplementAbstractMembers(compilers),
     new ImportMissingSymbol(compilers),
@@ -47,7 +49,7 @@ final class CodeActionProvider(
     new StringActions(buffers, trees),
     new OrganizeImports(scalafixProvider, buildTargets),
     new InsertInferredType(trees, compilers),
-    renameAction
+    new RenameActions(buffers, trees, renameProvider, resolveSupport)
   )
 
   def codeActions(
@@ -75,14 +77,20 @@ final class CodeActionProvider(
       token: CancelToken
   )(implicit ec: ExecutionContext): Future[l.CodeAction] = {
 
-    val data = codeAction.getData
+    lazy val identityCodeAction = Future.successful(codeAction)
 
-    data match {
-      case renameClassActionData: RenameClassActionData =>
-        renameAction
-          .resolve(renameClassActionData, token)
-      case _ => Future.successful(codeAction)
+    val data = codeAction.getData.toJsonObject
+
+    val basePF: PartialFunction[JsonObject, Future[l.CodeAction]] = { case _ =>
+      identityCodeAction
     }
+
+    val partialFunction: PartialFunction[JsonObject, Future[l.CodeAction]] =
+      allActions.foldRight(basePF)((codeAction, pf) =>
+        codeAction.resolve(token) orElse pf
+      )
+
+    partialFunction(data)
 
   }
 
