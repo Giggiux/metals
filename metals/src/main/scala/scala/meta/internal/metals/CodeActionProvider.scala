@@ -37,7 +37,7 @@ final class CodeActionProvider(
     codeActionCapabilities.map(_.getDataSupport)
 
   private val resolveSupport: Boolean = (for {
-    resolveSupportCapabilities <- codeActionResolveSupportCapabilities
+    resolveSupportCapabilities <- codeActionResolveSupportCapabilities if( resolveSupportCapabilities != null )
     dataSupport <- codeActionDataSupport
     properties = resolveSupportCapabilities.getProperties
   } yield dataSupport && properties.contains("edit")).getOrElse(false)
