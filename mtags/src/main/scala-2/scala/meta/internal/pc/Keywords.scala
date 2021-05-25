@@ -11,31 +11,22 @@ trait Keywords { this: MetalsGlobal =>
       editRange: l.Range,
       latestEnclosing: List[Tree],
       completion: CompletionPosition
-  ): List[Member] = {
-    getIdentifierName(latestEnclosing, pos) match {
-      case None =>
-        completion match {
-          // This whole block is meant to catch top level completions, however
-          // it's also valid to have a scaladoc comment at the top level, so we
-          // explicitly check that we don't have a scaladocCompletion before we
-          // grab the top level completions since it's safe to assume if someone
-          // has already typed /* then they are going for the scaladoc, not the
-          // other stuff.
-          case _: ScaladocCompletion => List.empty
-          case _ =>
-            Keyword.all.collect {
-              case kw if kw.isPackage => mkTextEditMember(kw, editRange)
-            }
+  ): List[Member] = completion match {
+      case _: ScaladocCompletion => List.empty
+      case CommentCompletion => List.empty
+      case _ => getIdentifierName(latestEnclosing, pos) match {
+        case None => Keyword.all.collect {
+          case kw if kw.isPackage => mkTextEditMember(kw, editRange)
         }
-      case Some(name) =>
-        val isExpression = this.isExpression(latestEnclosing)
-        val isBlock = this.isBlock(latestEnclosing)
-        val isDefinition = this.isDefinition(latestEnclosing, name, pos)
-        val isMethodBody = this.isMethodBody(latestEnclosing)
-        val isTemplate = this.isTemplate(latestEnclosing)
-        val isPackage = this.isPackage(latestEnclosing)
-        Keyword.all.collect {
-          case kw
+        case Some(name) =>
+          val isExpression = this.isExpression(latestEnclosing)
+          val isBlock = this.isBlock(latestEnclosing)
+          val isDefinition = this.isDefinition(latestEnclosing, name, pos)
+          val isMethodBody = this.isMethodBody(latestEnclosing)
+          val isTemplate = this.isTemplate(latestEnclosing)
+          val isPackage = this.isPackage(latestEnclosing)
+          Keyword.all.collect {
+            case kw
               if kw.matchesPosition(
                 name,
                 isExpression = isExpression,
@@ -45,10 +36,10 @@ trait Keywords { this: MetalsGlobal =>
                 isTemplate = isTemplate,
                 isPackage = isPackage
               ) =>
-            mkTextEditMember(kw, editRange)
-        }
+              mkTextEditMember(kw, editRange)
+          }
+      }
     }
-  }
 
   private def getIdentifierName(
       enclosing: List[Tree],

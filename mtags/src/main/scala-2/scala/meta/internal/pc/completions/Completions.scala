@@ -409,6 +409,79 @@ trait Completions { this: MetalsGlobal =>
         NoneCompletion
     }
   }
+
+  private def isComment(str: String, pos: Position): Boolean = {
+    object CommentDelimiter extends Enumeration {
+      type CommentDelimiter = Value
+      val Init, End = Value
+    }
+    //check if line contains \/\* or starts with \s* or .*\*\/
+    // or if line contains before position //
+    val lineIdx = pos.line - 1
+
+    val lines = str.split(util.Properties.lineSeparator)
+    val linesWithIdx = lines.zipWithIndex
+    val line = lines(lineIdx)
+    //TODO: Fix that in string interpolations this will still be considered multiline or comment
+    val commentDelimitersWithIdx = linesWithIdx.flatMap {
+      case (line, idx) if line.contains("/**") => Some((CommentDelimiter.Init, idx))
+      case (line, idx) if line.contains("*/") => Some((CommentDelimiter.End, idx))
+      case _ => None
+    }.toList
+
+    val previousLinesChars = lines.take(lineIdx)
+      .foldLeft(0)((sum, s) => sum + s.length) + lineIdx // Adding the splitting \n
+
+    val char = pos.start - previousLinesChars
+
+    def multilineCommentRanges(commentDelimiters: List[CommentDelimiter.Value]): List[(Int, Int)] = {
+      val initIdx = commentDelimiters.indexOf(CommentDelimiter.Init)
+      initIdx match {
+        case -1 => Nil
+        case _ =>
+          val endIdx = commentDelimiters.indexOf(CommentDelimiter.End)
+          endIdx match {
+            case -1 => (initIdx, -1) :: Nil
+            case _ => (initIdx, endIdx) :: multilineCommentRanges(commentDelimiters.drop(endIdx+1))
+          }
+      }
+    }
+
+    def relToAbsIdx(idx: Int): Int = commentDelimitersWithIdx(idx)._2
+
+    lazy val isInMultiline = {
+      val mcr = multilineCommentRanges(commentDelimitersWithIdx.map(_._1))
+      val ranges = mcr.map {
+        case (idx, -1) => (relToAbsIdx(idx), -1)
+        case (idx1, idx2) => (relToAbsIdx(idx1), relToAbsIdx(idx2))
+      }
+
+      def sameLineInit(): Boolean = line.indexOf("/**") < char
+      def sameLineEnd(): Boolean = line.indexOf("*/") > char
+
+      ranges.exists {
+        case (initIdx, -1) if initIdx < lineIdx => true
+        case (initIdx, endIdx) if initIdx < lineIdx  && lineIdx < endIdx => true
+        case (initIdx, -1) if lineIdx == initIdx => sameLineInit()
+        case (initIdx, endIdx) if initIdx < lineIdx && lineIdx == endIdx => sameLineEnd()
+        case _ => false
+      }
+    }
+
+    val isInComment = {
+      val initMultiline = line.indexOf("/**")
+      val endMultiline = line.indexOf("*/")
+      val comment = line.indexOf("//")
+
+      val isCharInMultiline = initMultiline <= char && char <= endMultiline
+      val isCharInComment = char >= comment
+
+      isCharInMultiline && isCharInComment
+    }
+
+    isInComment || isInMultiline
+  }
+
   def completionPositionUnsafe(
       pos: Position,
       source: URI,
@@ -438,11 +511,9 @@ trait Completions { this: MetalsGlobal =>
         val associatedDef = onUnitOf(pos.source) { unit =>
           new AssociatedMemberDefFinder(pos).findAssociatedDef(unit.body)
         }
-        associatedDef
-          .map(definition =>
-            ScaladocCompletion(editRange, Some(definition), pos, text)
-          )
-          .getOrElse(ScaladocCompletion(editRange, None, pos, text))
+        ScaladocCompletion(editRange, associatedDef, pos, text)
+      case _ if this.isComment(text, pos) =>
+        CommentCompletion
       case (ident: Ident) :: (a: Apply) :: _ =>
         fromIdentApply(ident, a)
       case (ident: Ident) :: (_: Select) :: (_: Assign) :: (a: Apply) :: _ =>

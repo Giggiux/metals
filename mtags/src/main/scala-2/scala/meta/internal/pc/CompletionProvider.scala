@@ -386,6 +386,14 @@ class CompletionProvider(
             editRange,
             noQuery
           )
+        case CommentCompletion =>
+          logger.warning(e.getMessage)
+          (
+            InterestingMembers(Nil, SymbolSearch.Result.COMPLETE),
+            CommentCompletion,
+            editRange,
+            noQuery
+          )
         case completion =>
           (
             InterestingMembers(
@@ -449,6 +457,7 @@ class CompletionProvider(
         completions,
         latestParentTrees
       )
+
       val query = completions.name.toString
       val items = filterInteresting(
         matchingResults,

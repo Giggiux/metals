@@ -9,6 +9,38 @@ class CompletionKeywordSuite extends BaseCompletionSuite {
     BuildInfoVersions.scala3Versions.toSet
 
   check(
+    "scaladoc-template",
+    """
+      |package foo
+      |
+      |object A {
+      |  /**
+      |  * tra@@
+      |  *
+      |  *
+      |  */
+      |  def method(): Unit = ()
+      |}
+      |""".stripMargin,
+    "",
+    includeCommitCharacter = true
+  )
+
+  check(
+    "comment-template",
+    """
+      |package foo
+      |
+      |object A {
+      |  // tra@@
+      |  def method(): Unit = ()
+      |}
+      |""".stripMargin,
+    "",
+    includeCommitCharacter = true
+  )
+
+  check(
     "super-template",
     """
       |package foo

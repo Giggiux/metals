@@ -5,5 +5,6 @@ import scala.meta.internal.pc.MetalsGlobal
 trait NoneCompletions { this: MetalsGlobal =>
 
   case object NoneCompletion extends CompletionPosition
+  case object CommentCompletion extends CompletionPosition
 
 }
