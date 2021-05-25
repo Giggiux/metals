@@ -424,17 +424,24 @@ trait Completions { this: MetalsGlobal =>
     val line = lines(lineIdx)
     //TODO: Fix that in string interpolations this will still be considered multiline or comment
     val commentDelimitersWithIdx = linesWithIdx.flatMap {
-      case (line, idx) if line.contains("/**") => Some((CommentDelimiter.Init, idx))
-      case (line, idx) if line.contains("*/") => Some((CommentDelimiter.End, idx))
+      case (line, idx) if line.contains("/**") =>
+        Some((CommentDelimiter.Init, idx))
+      case (line, idx) if line.contains("*/") =>
+        Some((CommentDelimiter.End, idx))
       case _ => None
     }.toList
 
-    val previousLinesChars = lines.take(lineIdx)
-      .foldLeft(0)((sum, s) => sum + s.length) + lineIdx // Adding the splitting \n
+    val previousLinesChars = lines
+      .take(lineIdx)
+      .foldLeft(0)((sum, s) =>
+        sum + s.length
+      ) + lineIdx // Adding the splitting \n
 
     val char = pos.start - previousLinesChars
 
-    def multilineCommentRanges(commentDelimiters: List[CommentDelimiter.Value]): List[(Int, Int)] = {
+    def multilineCommentRanges(
+        commentDelimiters: List[CommentDelimiter.Value]
+    ): List[(Int, Int)] = {
       val initIdx = commentDelimiters.indexOf(CommentDelimiter.Init)
       initIdx match {
         case -1 => Nil
@@ -442,7 +449,10 @@ trait Completions { this: MetalsGlobal =>
           val endIdx = commentDelimiters.indexOf(CommentDelimiter.End)
           endIdx match {
             case -1 => (initIdx, -1) :: Nil
-            case _ => (initIdx, endIdx) :: multilineCommentRanges(commentDelimiters.drop(endIdx+1))
+            case _ =>
+              (initIdx, endIdx) :: multilineCommentRanges(
+                commentDelimiters.drop(endIdx + 1)
+              )
           }
       }
     }
@@ -461,9 +471,10 @@ trait Completions { this: MetalsGlobal =>
 
       ranges.exists {
         case (initIdx, -1) if initIdx < lineIdx => true
-        case (initIdx, endIdx) if initIdx < lineIdx  && lineIdx < endIdx => true
+        case (initIdx, endIdx) if initIdx < lineIdx && lineIdx < endIdx => true
         case (initIdx, -1) if lineIdx == initIdx => sameLineInit()
-        case (initIdx, endIdx) if initIdx < lineIdx && lineIdx == endIdx => sameLineEnd()
+        case (initIdx, endIdx) if initIdx < lineIdx && lineIdx == endIdx =>
+          sameLineEnd()
         case _ => false
       }
     }

@@ -12,12 +12,14 @@ trait Keywords { this: MetalsGlobal =>
       latestEnclosing: List[Tree],
       completion: CompletionPosition
   ): List[Member] = completion match {
-      case _: ScaladocCompletion => List.empty
-      case CommentCompletion => List.empty
-      case _ => getIdentifierName(latestEnclosing, pos) match {
-        case None => Keyword.all.collect {
-          case kw if kw.isPackage => mkTextEditMember(kw, editRange)
-        }
+    case _: ScaladocCompletion => List.empty
+    case CommentCompletion => List.empty
+    case _ =>
+      getIdentifierName(latestEnclosing, pos) match {
+        case None =>
+          Keyword.all.collect {
+            case kw if kw.isPackage => mkTextEditMember(kw, editRange)
+          }
         case Some(name) =>
           val isExpression = this.isExpression(latestEnclosing)
           val isBlock = this.isBlock(latestEnclosing)
@@ -27,19 +29,19 @@ trait Keywords { this: MetalsGlobal =>
           val isPackage = this.isPackage(latestEnclosing)
           Keyword.all.collect {
             case kw
-              if kw.matchesPosition(
-                name,
-                isExpression = isExpression,
-                isBlock = isBlock,
-                isDefinition = isDefinition,
-                isMethodBody = isMethodBody,
-                isTemplate = isTemplate,
-                isPackage = isPackage
-              ) =>
+                if kw.matchesPosition(
+                  name,
+                  isExpression = isExpression,
+                  isBlock = isBlock,
+                  isDefinition = isDefinition,
+                  isMethodBody = isMethodBody,
+                  isTemplate = isTemplate,
+                  isPackage = isPackage
+                ) =>
               mkTextEditMember(kw, editRange)
           }
       }
-    }
+  }
 
   private def getIdentifierName(
       enclosing: List[Tree],
