@@ -415,14 +415,14 @@ trait Completions { this: MetalsGlobal =>
       type CommentDelimiter = Value
       val Init, End = Value
     }
-    //check if line contains \/\* or starts with \s* or .*\*\/
-    // or if line contains before position //
+    // check if the position is between /** and */
+    // or if line contains before char's position //
     val lineIdx = pos.line - 1
 
     val lines = str.split(util.Properties.lineSeparator)
     val linesWithIdx = lines.zipWithIndex
     val line = lines(lineIdx)
-    //TODO: Fix that in string interpolations this will still be considered multiline or comment
+
     val commentDelimitersWithIdx = linesWithIdx.flatMap {
       case (line, idx) if line.contains("/**") =>
         Some((CommentDelimiter.Init, idx))
@@ -523,7 +523,7 @@ trait Completions { this: MetalsGlobal =>
           new AssociatedMemberDefFinder(pos).findAssociatedDef(unit.body)
         }
         ScaladocCompletion(editRange, associatedDef, pos, text)
-      case _ if this.isComment(text, pos) =>
+      case _ if isComment(text, pos) =>
         CommentCompletion
       case (ident: Ident) :: (a: Apply) :: _ =>
         fromIdentApply(ident, a)
