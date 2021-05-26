@@ -487,7 +487,7 @@ trait Completions { this: MetalsGlobal =>
       val isCharInMultiline = initMultiline <= char && char <= endMultiline
       val isCharInComment = char >= comment
 
-      isCharInMultiline && isCharInComment
+      isCharInMultiline || isCharInComment
     }
 
     isInComment || isInMultiline
