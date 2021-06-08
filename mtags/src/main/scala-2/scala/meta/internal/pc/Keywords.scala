@@ -1,8 +1,11 @@
 package scala.meta.internal.pc
 
 import scala.tools.nsc.reporters.StoreReporter
-
 import org.eclipse.{lsp4j => l}
+
+import scala.meta.XtensionTokenizeInputLike
+import scala.meta.tokenizers.Tokenized
+import scala.meta.tokens.Token
 
 trait Keywords { this: MetalsGlobal =>
 
@@ -10,8 +13,17 @@ trait Keywords { this: MetalsGlobal =>
       pos: Position,
       editRange: l.Range,
       latestEnclosing: List[Tree],
-      completion: CompletionPosition
+      completion: CompletionPosition,
+      text: String
   ): List[Member] = {
+    val start = pos.start
+    val end = pos.end
+    val tokens = text.tokenize.toOption
+    val notInComment = tokens.flatMap(t => t.find {
+      case t: Token.Comment if t.pos.start < start && t.pos.end >= end => true
+      case _ => false
+    }).isEmpty
+
     getIdentifierName(latestEnclosing, pos) match {
       case None =>
         completion match {
@@ -22,12 +34,13 @@ trait Keywords { this: MetalsGlobal =>
           // has already typed /* then they are going for the scaladoc, not the
           // other stuff.
           case _: ScaladocCompletion => List.empty
-          case _ =>
+          case _ if notInComment =>
             Keyword.all.collect {
               case kw if kw.isPackage => mkTextEditMember(kw, editRange)
             }
+          case _ => List.empty
         }
-      case Some(name) =>
+      case Some(name) if notInComment =>
         val isExpression = this.isExpression(latestEnclosing)
         val isBlock = this.isBlock(latestEnclosing)
         val isDefinition = this.isDefinition(latestEnclosing, name, pos)
@@ -47,6 +60,7 @@ trait Keywords { this: MetalsGlobal =>
               ) =>
             mkTextEditMember(kw, editRange)
         }
+      case _ => List.empty
     }
   }
 
