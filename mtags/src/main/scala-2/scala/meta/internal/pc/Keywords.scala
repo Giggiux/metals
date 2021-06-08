@@ -19,10 +19,15 @@ trait Keywords { this: MetalsGlobal =>
     val start = pos.start
     val end = pos.end
     val tokens = text.tokenize.toOption
-    val notInComment = tokens.flatMap(t => t.find {
-      case t: Token.Comment if t.pos.start < start && t.pos.end >= end => true
-      case _ => false
-    }).isEmpty
+    val notInComment = tokens
+      .flatMap(t =>
+        t.find {
+          case t: Token.Comment if t.pos.start < start && t.pos.end >= end =>
+            true
+          case _ => false
+        }
+      )
+      .isEmpty
 
     getIdentifierName(latestEnclosing, pos) match {
       case None =>
